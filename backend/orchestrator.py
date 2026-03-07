@@ -32,6 +32,7 @@ from relevance import check_relevance
 from task_parser import parse_tasks, diff_tasks, tasks_to_md, Task
 from github_ops import create_issue, edit_issue, close_issue, remove_label, add_label
 from plan_generator import generate_plan
+from pr_creator import sanity_check, implement_and_pr
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
@@ -164,9 +165,26 @@ def handle_github_ops(changes: dict, dry_run: bool = False):
                 print(f"  [github] Created #{issue_num}")
 
 
+def _persist_task_status(task_id: int, new_status: str):
+    """Read tasks.md, update one task's status, write back."""
+    current_md = read_tasks_md()
+    old_tasks = parse_tasks(current_md) if current_md else []
+    for t in old_tasks:
+        if t.id == task_id:
+            t.status = new_status
+            if new_status == "draft":
+                t.is_draft_tag = True
+            break
+    header = f"# Meeting Tasks — {datetime.now().strftime('%Y-%m-%d')}\n\n"
+    write_tasks_md(header + tasks_to_md(old_tasks))
+    print(f"  [pipeline] TASK-{task_id} status → {new_status}")
+
+
 def _run_plan_in_background(task: Task, dry_run: bool = False):
-    """Run plan generation in a background thread, update task status on completion."""
+    """Run Phase 2 (plan) + Phase 3 (sanity check + PR) in a background thread."""
     issue_num = task.issue_number.lstrip("#")
+
+    # --- Phase 2: Plan Generation ---
     plan = generate_plan(
         title=task.title,
         description=task.description,
@@ -175,21 +193,48 @@ def _run_plan_in_background(task: Task, dry_run: bool = False):
         issue_number=issue_num,
         dry_run=dry_run,
     )
-    current_md = read_tasks_md()
-    old_tasks = parse_tasks(current_md) if current_md else []
-    if plan:
-        new_status = "planned"
+
+    if not plan:
+        _persist_task_status(task.id, "draft")
+        return
+
+    _persist_task_status(task.id, "planned")
+
+    # --- Phase 3: Sanity Check + Implementation ---
+    # Update labels: planned → implementing
+    if not dry_run:
+        remove_label(issue_num, "planned")
+        add_label(issue_num, "implementing")
+    _persist_task_status(task.id, "implementing")
+
+    # Phase 3.1: Sanity check
+    is_actionable = sanity_check(
+        plan=plan,
+        title=task.title,
+        description=task.description,
+        issue_number=issue_num,
+        dry_run=dry_run,
+    )
+
+    if not is_actionable:
+        _persist_task_status(task.id, "cancelled")
+        return
+
+    # Phase 3.2: Implementation + PR
+    pr_url = implement_and_pr(
+        plan=plan,
+        task_id=task.id,
+        title=task.title,
+        description=task.description,
+        label=task.label,
+        issue_number=issue_num,
+        dry_run=dry_run,
+    )
+
+    if pr_url:
+        _persist_task_status(task.id, "pr-open")
     else:
-        new_status = "draft"
-    for t in old_tasks:
-        if t.id == task.id:
-            t.status = new_status
-            if new_status == "draft":
-                t.is_draft_tag = True
-            break
-    header = f"# Meeting Tasks — {datetime.now().strftime('%Y-%m-%d')}\n\n"
-    write_tasks_md(header + tasks_to_md(old_tasks))
-    print(f"  [plan] TASK-{task.id} status → {new_status}")
+        _persist_task_status(task.id, "planned")
 
 
 def handle_stabilization(unchanged_tasks: list[Task], dry_run: bool = False):

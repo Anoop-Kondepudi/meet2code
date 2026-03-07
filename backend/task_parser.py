@@ -9,7 +9,7 @@ class Task:
     id: int
     title: str
     issue_number: str  # "(pending)" or "#42"
-    status: str  # "draft", "cancelled", "planning", or "planned"
+    status: str  # "draft", "cancelled", "planning", "planned", "implementing", or "pr-open"
     label: str
     last_updated: str
     description: str
@@ -32,7 +32,7 @@ def parse_tasks(md_content: str) -> list[Task]:
 
         # Parse header: ## TASK-1: Fix something [DRAFT]
         header_match = re.match(
-            r"^## TASK-(\d+):\s*(.+?)(?:\s*\[(DRAFT|CANCELLED|PLANNING|PLANNED)\])?\s*$",
+            r"^## TASK-(\d+):\s*(.+?)(?:\s*\[(DRAFT|CANCELLED|PLANNING|PLANNED|IMPLEMENTING|PR-OPEN)\])?\s*$",
             block.split("\n")[0],
         )
         if not header_match:
@@ -140,6 +140,10 @@ def tasks_to_md(tasks: list[Task]) -> str:
             tag = "[PLANNING]"
         elif t.status == "planned":
             tag = "[PLANNED]"
+        elif t.status == "implementing":
+            tag = "[IMPLEMENTING]"
+        elif t.status == "pr-open":
+            tag = "[PR-OPEN]"
         lines.append(f"## TASK-{t.id}: {t.title} {tag}".rstrip())
         lines.append(f"Issue: {t.issue_number}")
         lines.append(f"Status: {t.status}")

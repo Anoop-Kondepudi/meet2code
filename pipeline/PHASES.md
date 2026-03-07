@@ -2,66 +2,97 @@
 
 ## Overview
 
-The pipeline processes meeting transcripts through multiple phases. Each phase has its own prompt and operates on a shared state file (`tasks.md`).
-
-All phases send the FULL transcript text accumulated so far (not just new chunks) for maximum context. Each call is stateless — no sessions, no memory. The `tasks.md` file IS the memory.
+The pipeline processes meeting transcripts through three phases. Each phase operates on a shared state file (`tasks.md`) and runs as stateless AI calls — no sessions, no memory. The `tasks.md` file IS the memory.
 
 ## Shared State
 
 **`data/tasks/tasks.md`** — single file that evolves through all phases. Every phase reads it, updates it, and writes it back.
 
-Header is written by the orchestrator with the current date.
+## Status Lifecycle
+
+```
+draft → planning → planned → implementing → pr-open
+                                    ↘ cancelled (sanity check fails)
+```
+
+| Status | GitHub Label | Trigger |
+|--------|-------------|---------|
+| `draft` | `draft` + category | Task first extracted from meeting |
+| `planning` | `planning` | Stabilized (3 unchanged cycles) or MEETING_ENDED |
+| `planned` | `planned` | Plan generated and posted as issue comment |
+| `implementing` | `implementing` | Sanity check passed, code being generated |
+| `pr-open` | `pr-open` | PR created and linked to issue |
+| `cancelled` | (issue closed) | AI cancels task, or sanity check fails |
 
 ## Phase 1: Task Extractor
 
 - **Trigger:** Every 5 seconds during a live meeting (configurable via --interval)
 - **Input:** Full transcript so far + current tasks.md
 - **Output:** Updated tasks.md with new/modified tasks
-- **Prompt:** `pipeline/prompts/task_extractor.md`
-- **Model:** gpt-4.1-nano via OpenAI API (~3.5s per call)
+- **Model:** gpt-4.1-nano via OpenAI API
+- **Code:** `backend/extractor.py`, `backend/orchestrator.py`
 - **What it does:**
   - Extract actionable tasks from conversation
   - Update existing tasks if more detail emerges
   - Detect if a task was walked back or cancelled
   - Create GitHub issues immediately with `draft` label
-  - Auto-stabilize: when a task hasn't changed for 3-4 consecutive chunks, flip from `draft` → `open` and remove the `draft` label on GitHub
+  - Relevance check: reset stabilization counter if task is still being discussed
+  - Auto-stabilize: 3 consecutive unchanged cycles → `draft` → `planning`
+  - MEETING_ENDED signal: immediately finalizes all remaining drafts
   - Never duplicate tasks
 
 ### GitHub Integration (during Phase 1)
-- New task extracted → `gh issue create` with `draft` label → store issue number in tasks.md
+- New task → `gh issue create` with `draft` + category label
 - Task updated → `gh issue edit` to update title/body/labels
-- Task stabilized (no updates for 3-4 chunks) → remove `draft` label, status becomes `open`
+- Task stabilized → labels: `draft` → `planning`, triggers Phase 2
 - Task cancelled → close the GitHub issue
 
-### Auto-Stabilization Logic
-Each task tracks `Unchanged-Cycles` (persisted in tasks.md). If a task hasn't been updated for 3 consecutive processing cycles, it's considered stable:
-1. Remove `draft` label on GitHub
-2. Set status to `open`
-3. This task is now eligible for Phase 2
+## Phase 2: Plan Generator
 
-## Phase 2: Plan Generator (TODO)
+- **Trigger:** Task status becomes `planning` (auto-stabilized or MEETING_ENDED)
+- **Input:** Task details + repo file tree
+- **Output:** Implementation plan posted as issue comment
+- **Model:** GPT-5.4 via Codex CLI (xhigh reasoning)
+- **Code:** `backend/plan_generator.py`
+- **Concurrency:** Runs in background threads, non-blocking to extraction loop
+- **On success:** Labels: `planning` → `planned`, plan posted as comment, chains to Phase 3
+- **On failure:** Comment posted explaining failure, labels reverted to `draft` for retry
 
-- **Trigger:** When a task's status becomes `open` (auto-stabilized)
-- **Input:** The specific task from tasks.md + relevant transcript context
-- **Output:** Updated tasks.md with implementation plan added to the task
-- **Prompt:** `pipeline/prompts/plan_generator.md` (not yet created)
-- **Model:** Stronger model (Claude Sonnet/Opus) — quality over speed
-- **GitHub:** Posts plan as a comment on the issue
+## Phase 3: PR Creator
 
-## Phase 3: PR Creator (TODO)
+Runs in the same background thread as Phase 2 (chained directly after plan generation).
 
-- **Trigger:** After plan is generated (or on manual approval)
-- **Input:** Task + plan from tasks.md
-- **Output:** GitHub PR with code changes
-- **Prompt:** `pipeline/prompts/pr_creator.md` (not yet created)
-- **Uses:** Claude Code CLI in headless mode
-- **GitHub:** Opens PR linked to the issue
+### Phase 3.1: Sanity Check
+
+- **Trigger:** Immediately after Phase 2 succeeds
+- **Input:** Plan text + task details
+- **Model:** GPT-5.4 via Codex CLI (xhigh reasoning, has codebase access)
+- **Code:** `backend/pr_creator.py` → `sanity_check()`
+- **What it does:** Evaluates whether the plan is concretely implementable. Catches cases where the plan says "not actionable" or "out of scope."
+- **On not actionable:** Comment posted with explanation, issue closed, status → `cancelled`
+- **On actionable:** Proceeds to Phase 3.2
+
+### Phase 3.2: Implementation + PR
+
+- **Trigger:** Sanity check passes
+- **Input:** Plan text + task details
+- **Model:** GPT-5.4 via Codex CLI (xhigh reasoning)
+- **Code:** `backend/pr_creator.py` → `implement_and_pr()`
+- **Concurrency:** Uses `git worktree` for isolation — each task gets its own working directory
+- **Steps:**
+  1. Create git worktree with branch `hackai-TASK-{id}`
+  2. Run Codex to implement changes in the worktree
+  3. Verify changes were made (non-empty diff)
+  4. Commit, push branch
+  5. Create PR via `gh pr create` with `Closes #{issue}` in body
+  6. Post comment on issue linking to PR
+  7. Labels: `implementing` → `pr-open`
+  8. Clean up worktree
+- **On failure:** Comment posted with error details, labels reverted to `planned`, worktree cleaned up
 
 ## Token Safety
 
-- Track token count of full transcript on each call
-- If transcript exceeds 80k tokens: stop processing, preserve tasks.md as-is
-- Send message via bot to meeting chat: "Meeting transcript limit reached. Task tracking paused — all tasks so far are preserved."
+- Hard stop at 80k tokens — preserve tasks.md as-is
 - For 5-10 min meetings (~2-3k tokens) this will not be hit
 
 ## Bot Messaging
@@ -69,4 +100,3 @@ Each task tracks `Unchanged-Cycles` (persisted in tasks.md). If a task hasn't be
 The pipeline can send messages back to the meeting chat via the bot:
 - Token limit reached
 - Error conditions
-- Potentially: task extraction confirmations

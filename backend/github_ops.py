@@ -95,6 +95,22 @@ def add_label(issue_number: str, label: str):
     ])
 
 
+def create_pr(branch: str, title: str, body: str) -> str | None:
+    """Create a PR from branch → main. Returns PR URL or None."""
+    code, stdout, stderr = run_gh([
+        "pr", "create",
+        "--repo", REPO,
+        "--head", branch,
+        "--title", title,
+        "--body", body,
+    ])
+    if code == 0 and stdout:
+        return stdout.strip()
+    if stderr:
+        log.error(f"Failed to create PR '{title}': {stderr}")
+    return None
+
+
 def comment_on_issue(issue_number: str, body: str) -> bool:
     """Post a comment on a GitHub issue. Returns True on success."""
     code, _, _ = run_gh([
