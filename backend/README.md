@@ -15,3 +15,17 @@ Task JSON from `shared/schemas/task.json`
 
 ## Output
 IssueStatus JSON matching `shared/schemas/issue_status.json`
+
+## Local meeting transcription websocket
+
+A lightweight local websocket server is available at `backend/meeting-audio-backend.js` for extension-driven live transcription with AssemblyAI.
+
+### Run
+
+```bash
+cd backend
+npm install
+ASSEMBLYAI_API_KEY=your_key_here npm start
+```
+
+The server listens on `ws://localhost:3001` (or `PORT` if set) and prints transcripts to stdout.
