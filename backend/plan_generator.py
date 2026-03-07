@@ -77,7 +77,7 @@ def generate_plan(title: str, description: str, label: str, source: str,
             capture_output=True,
             text=True,
             cwd=PROJECT_ROOT,
-            timeout=180,
+            timeout=300,
         )
 
         if result.returncode != 0:

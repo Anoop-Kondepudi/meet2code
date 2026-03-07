@@ -258,10 +258,6 @@ def run_cycle(source_dir: Path, dry_run: bool = False, prev_chunk_count: int = 0
             header = f"# Meeting Tasks — {datetime.now().strftime('%Y-%m-%d')}\n\n"
             write_tasks_md(header + tasks_to_md(old_tasks))
             print(f"  [finalize] {finalized} task(s) moved from draft → planning")
-        # Wait for all plan threads to finish before returning
-        for t in _plan_threads:
-            t.join()
-        _plan_threads.clear()
         return True, chunk_count
 
     # 3. Token safety check
@@ -333,13 +329,6 @@ def run_cycle(source_dir: Path, dry_run: bool = False, prev_chunk_count: int = 0
 
     print(f"  [write] Updated {TASKS_FILE}")
 
-    # Wait for any plan generation threads from stabilization
-    if _plan_threads:
-        print(f"  [plan] Waiting for {len(_plan_threads)} plan(s) to complete...")
-        for t in _plan_threads:
-            t.join()
-        _plan_threads.clear()
-
     return True, chunk_count
 
 
@@ -363,6 +352,11 @@ def main():
     if args.once:
         print(f"[cycle] Running single extraction...")
         run_cycle(source_dir, args.dry_run)
+        if _plan_threads:
+            print("[stop] Waiting for plan generation to finish...")
+            for t in _plan_threads:
+                t.join()
+            _plan_threads.clear()
         return
 
     cycle = 0
@@ -387,6 +381,13 @@ def main():
         except KeyboardInterrupt:
             print("\n[stop] Shutting down gracefully.")
             break
+
+    # Wait for any in-flight plan generation threads
+    if _plan_threads:
+        print("[stop] Waiting for plan generation to finish...")
+        for t in _plan_threads:
+            t.join()
+        _plan_threads.clear()
 
 
 if __name__ == "__main__":
