@@ -32,7 +32,7 @@ Contracts between stages are defined in `shared/schemas/`.
 ```bash
 git clone https://github.com/Anoop-Kondepudi/hackai.git
 cd hackai
-cp shared/config/.env.example .env
+cp shared/config/.env .env
 # Fill in your API keys in .env
 ```
 
