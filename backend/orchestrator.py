@@ -142,7 +142,7 @@ def handle_github_ops(changes: dict, dry_run: bool = False):
 
     # Retry issue creation for tasks stuck at (pending) from prior failures
     for task in changes["unchanged"]:
-        if task.issue_number == "(pending)" and task.status == "draft":
+        if task.issue_number == "(pending)":
             if dry_run:
                 print(f"  [dry-run] Would retry issue creation: {task.title}")
                 continue

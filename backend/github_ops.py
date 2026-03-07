@@ -22,8 +22,14 @@ def run_gh(args: list[str]) -> tuple[int, str, str]:
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 
+def _validate_label(label: str) -> str:
+    """Ensure label is one of the allowed categories."""
+    return label if label in CATEGORY_LABELS else "improvement"
+
+
 def create_issue(title: str, body: str, label: str) -> str | None:
     """Create a GitHub issue with draft label. Returns issue number or None."""
+    label = _validate_label(label)
     code, stdout, stderr = run_gh([
         "issue", "create",
         "--repo", REPO,
@@ -48,6 +54,7 @@ def edit_issue(
     previous_label: str = "",
 ):
     """Update an existing GitHub issue's title, body, and label."""
+    label = _validate_label(label)
     args = [
         "issue", "edit", issue_number,
         "--repo", REPO,

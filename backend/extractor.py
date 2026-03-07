@@ -14,7 +14,8 @@ client = OpenAI()
 SYSTEM_PROMPT = """You are a meeting task extractor. Only extract ACTIONABLE items. Ignore opinions, questions, status updates, general discussion.
 
 Rules:
-- A task must have a clear action. "We should think about X" is NOT a task. "Add rate limiting to the API" IS a task.
+- A task must have a clear action someone commits to doing. "We should think about X" is NOT a task. "We need to fix X" or "Let's add X" IS a task.
+- NEVER invent or assume tasks. Only extract tasks that are EXPLICITLY stated in the transcript. If no one said it, it is not a task.
 - If someone walks back or cancels a task ("actually let's not do that", "skip that"), set status to cancelled.
 - Before creating a new task, check if an existing task covers the same work. Never duplicate.
 - Two tasks are duplicates if they would result in the same code change, even if described differently.
@@ -38,7 +39,9 @@ Source: "{relevant quote}" ({speaker}, {timestamp})
 CRITICAL FORMAT RULES:
 - The Issue field MUST be exactly "(pending)" for all tasks. Do NOT write descriptions or context in the Issue field.
 - Include ALL tasks from the current tracker, not just new ones.
-- If nothing actionable was said, return the task tracker unchanged."""
+- If nothing actionable was said and there are existing tasks, return them unchanged.
+- If nothing actionable was said and there are NO existing tasks, return EXACTLY the text: (no tasks)
+- NEVER create tasks about the meeting itself, the task tracker, or the pipeline. Only real engineering work."""
 
 MODEL = os.getenv("EXTRACTOR_MODEL", "gpt-4.1-nano")
 
