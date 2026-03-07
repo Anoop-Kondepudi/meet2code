@@ -10,15 +10,15 @@ All phases send the FULL transcript text accumulated so far (not just new chunks
 
 **`data/tasks/tasks.md`** — single file that evolves through all phases. Every phase reads it, updates it, and writes it back.
 
-Template: `pipeline/templates/tasks_template.md`
+Header is written by the orchestrator with the current date.
 
 ## Phase 1: Task Extractor
 
-- **Trigger:** Every 3-5 seconds during a live meeting
+- **Trigger:** Every 5 seconds during a live meeting (configurable via --interval)
 - **Input:** Full transcript so far + current tasks.md
 - **Output:** Updated tasks.md with new/modified tasks
 - **Prompt:** `pipeline/prompts/task_extractor.md`
-- **Model:** Fast model (Codex Spark / Haiku) — needs near-instant response
+- **Model:** gpt-4.1-nano via OpenAI API (~3.5s per call)
 - **What it does:**
   - Extract actionable tasks from conversation
   - Update existing tasks if more detail emerges
@@ -34,7 +34,7 @@ Template: `pipeline/templates/tasks_template.md`
 - Task cancelled → close the GitHub issue
 
 ### Auto-Stabilization Logic
-Each task tracks `Last-Updated` timestamp. The orchestrator compares this against the current chunk timestamp. If a task hasn't been updated for 3-4 consecutive processing cycles, it's considered stable:
+Each task tracks `Unchanged-Cycles` (persisted in tasks.md). If a task hasn't been updated for 3 consecutive processing cycles, it's considered stable:
 1. Remove `draft` label on GitHub
 2. Set status to `open`
 3. This task is now eligible for Phase 2

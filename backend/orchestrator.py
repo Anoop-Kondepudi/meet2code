@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+import logging
 import os
 import sys
 import time
@@ -28,6 +29,8 @@ load_dotenv(PROJECT_ROOT / ".env")
 from extractor import extract_tasks
 from task_parser import parse_tasks, diff_tasks, tasks_to_md, Task
 from github_ops import create_issue, edit_issue, close_issue, remove_label
+
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 # Paths
 TRANSCRIPTS_DIR = PROJECT_ROOT / "data" / "transcripts"
@@ -53,8 +56,8 @@ def read_transcripts(source_dir: Path) -> str:
                     all_chunks.extend(data)
                 elif isinstance(data, dict):
                     all_chunks.append(data)
-        except (json.JSONDecodeError, KeyError):
-            print(f"  [warn] Skipping malformed file: {f.name}")
+        except (json.JSONDecodeError, UnicodeDecodeError, PermissionError) as e:
+            print(f"  [warn] Skipping {f.name}: {e}")
             continue
 
     # Sort by timestamp
@@ -136,6 +139,23 @@ def handle_github_ops(changes: dict, dry_run: bool = False):
         print(f"  [github] Closing #{issue_num}: {task.title} (cancelled)")
         close_issue(issue_num)
 
+    # Retry issue creation for tasks stuck at (pending) from prior failures
+    for task in changes["unchanged"]:
+        if task.issue_number == "(pending)" and task.status == "draft":
+            if dry_run:
+                print(f"  [dry-run] Would retry issue creation: {task.title}")
+                continue
+
+            print(f"  [github] Retrying issue creation: {task.title}")
+            issue_num = create_issue(
+                title=task.title,
+                body=format_issue_body(task),
+                label=task.label,
+            )
+            if issue_num:
+                task.issue_number = f"#{issue_num}"
+                print(f"  [github] Created #{issue_num}")
+
 
 def handle_stabilization(unchanged_tasks: list[Task], dry_run: bool = False):
     """Auto-stabilize tasks that haven't changed for N cycles."""
@@ -174,17 +194,23 @@ def run_cycle(source_dir: Path, dry_run: bool = False) -> bool:
     start = time.time()
     new_md = extract_tasks(transcript_text, current_md)
     elapsed = time.time() - start
+
+    # Handle API failure — preserve existing tasks
+    if new_md is None:
+        print(f"  [extract] API call failed after {elapsed:.2f}s — preserving existing tasks")
+        return True
+
     print(f"  [extract] Done in {elapsed:.2f}s")
 
     # 5. Parse new tasks
     new_tasks = parse_tasks(new_md)
 
-    if not new_tasks:
+    if not new_tasks and not old_tasks:
         print("  [extract] No tasks extracted")
         return True
 
-    # 6. Diff
-    changes = diff_tasks(old_tasks, new_tasks)
+    # 6. Diff (also preserves old tasks dropped by AI)
+    changes = diff_tasks(old_tasks, new_tasks if new_tasks else [])
 
     added_count = len(changes["added"])
     updated_count = len(changes["updated"])

@@ -29,11 +29,11 @@ hackai/
 - Every model call is independent — no sessions, no persistent connections
 - Full transcript + full `tasks.md` sent every call
 - `tasks.md` is the single source of truth (the memory)
-- Fast model (Codex Spark / Haiku) for extraction, stronger model for planning
+- gpt-4.1-nano via OpenAI API for extraction (~3.5s per call), stronger model for planning
 
 ### Three Phases
 
-**Phase 1: Task Extractor** (every 3-5 sec during meeting)
+**Phase 1: Task Extractor** (every 5 sec, configurable)
 - Input: full transcript + tasks.md
 - Output: updated tasks.md
 - Creates GitHub issues immediately with `draft` label
@@ -91,7 +91,7 @@ Designed for the messiest case — works with local files, can be swapped to Sup
 - `data/audio/` — raw audio from bot (consumed by transcription)
 - `data/transcripts/` — JSON transcript chunks (consumed by pipeline)
 - `data/tasks/tasks.md` — shared task state (read/written by all pipeline phases)
-- `data/issues/` — additional issue tracking if needed
+- Issue tracking is done via the `Issue:` field in tasks.md and `gh` CLI
 
 ## Team Responsibilities
 
