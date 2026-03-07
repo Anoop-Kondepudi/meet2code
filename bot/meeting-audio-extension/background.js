@@ -1,9 +1,7 @@
 let ws;
-let mediaStream;
-let audioContext;
-let processor;
 let isStreaming = false;
 let activeCaptureTabId = null;
+const OFFSCREEN_URL = "offscreen.html";
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Live Transcriber extension installed.");
@@ -32,12 +30,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.action === "GET_STATE") {
-    sendResponse({
-      ok: true,
-      isStreaming,
-      tabId: activeCaptureTabId
-    });
+    sendResponse({ ok: true, isStreaming, tabId: activeCaptureTabId });
     return true;
+  }
+
+  if (msg.action === "AUDIO_CHUNK") {
+    if (ws && ws.readyState === WebSocket.OPEN && msg.chunk) {
+      ws.send(msg.chunk);
+    }
+    return false;
+  }
+
+  if (msg.action === "CAPTURE_ERROR") {
+    sendStatusError(msg.message || "Audio capture failed");
+    stopStreaming();
+    return false;
   }
 
   return false;
@@ -57,11 +64,8 @@ async function startStreaming(requestedTabId) {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data.type === "TRANSCRIPT") {
-        chrome.runtime.sendMessage(data);
-      } else if (data.type === "ERROR") {
-        sendStatusError(data.message || "Unknown backend error");
-      }
+      if (data.type === "TRANSCRIPT") chrome.runtime.sendMessage(data);
+      else if (data.type === "ERROR") sendStatusError(data.message || "Unknown backend error");
     } catch (error) {
       console.error("Invalid backend message:", error);
     }
@@ -73,30 +77,23 @@ async function startStreaming(requestedTabId) {
   };
 
   ws.onclose = () => {
-    if (isStreaming) {
-      sendStatus("Disconnected");
-    }
-    cleanupAudio();
+    if (isStreaming) sendStatus("Disconnected");
     isStreaming = false;
     activeCaptureTabId = null;
+    stopOffscreenCapture();
   };
 
   await waitForWebSocketOpen(ws);
+  await ensureOffscreenDocument();
 
-  mediaStream = await captureTabAudio();
+  const streamId = await getTabMediaStreamId(tabId);
 
-  audioContext = new AudioContext({ sampleRate: 16000 });
-  const source = audioContext.createMediaStreamSource(mediaStream);
-  processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-  source.connect(processor);
-  processor.connect(audioContext.destination);
-
-  processor.onaudioprocess = (event) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    const floatData = event.inputBuffer.getChannelData(0);
-    ws.send(floatTo16BitPCM(floatData));
-  };
+  await chrome.runtime.sendMessage({
+    action: "START_CAPTURE",
+    streamId,
+    tabId,
+    sampleRate: 16000
+  });
 
   isStreaming = true;
   sendStatus(`Recording tab ${activeCaptureTabId}`);
@@ -104,8 +101,7 @@ async function startStreaming(requestedTabId) {
 
 function stopStreaming() {
   isStreaming = false;
-
-  cleanupAudio();
+  stopOffscreenCapture();
 
   if (ws) {
     try {
@@ -120,42 +116,21 @@ function stopStreaming() {
   sendStatus("Stopped");
 }
 
-function cleanupAudio() {
-  if (processor) {
-    try {
-      processor.disconnect();
-    } catch (error) {
-      console.error("Error disconnecting processor:", error);
-    }
-    processor = null;
-  }
-
-  if (audioContext) {
-    audioContext.close().catch(() => {});
-    audioContext = null;
-  }
-
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((track) => track.stop());
-    mediaStream = null;
-  }
+function stopOffscreenCapture() {
+  chrome.runtime
+    .sendMessage({ action: "STOP_CAPTURE" })
+    .catch(() => {
+      // No-op: offscreen may not be ready/created.
+    });
 }
 
-function captureTabAudio() {
-  return new Promise((resolve, reject) => {
-    chrome.tabCapture.capture({ audio: true, video: false }, (stream) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
+async function ensureOffscreenDocument() {
+  if (await chrome.offscreen.hasDocument()) return;
 
-      if (!stream) {
-        reject(new Error("Tab audio capture failed. Start from the tab you want to capture."));
-        return;
-      }
-
-      resolve(stream);
-    });
+  await chrome.offscreen.createDocument({
+    url: OFFSCREEN_URL,
+    reasons: ["USER_MEDIA"],
+    justification: "Capture tab audio for realtime transcription"
   });
 }
 
@@ -166,8 +141,25 @@ function getCurrentActiveTabId() {
         reject(new Error(chrome.runtime.lastError.message));
         return;
       }
-
       resolve(tabs?.[0]?.id);
+    });
+  });
+}
+
+function getTabMediaStreamId(tabId) {
+  return new Promise((resolve, reject) => {
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      if (!streamId) {
+        reject(new Error("Failed to create tab media stream id."));
+        return;
+      }
+
+      resolve(streamId);
     });
   });
 }
@@ -176,15 +168,23 @@ function waitForWebSocketOpen(socket) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Timed out while connecting to backend.")), 5000);
 
-    socket.addEventListener("open", () => {
-      clearTimeout(timeout);
-      resolve();
-    }, { once: true });
+    socket.addEventListener(
+      "open",
+      () => {
+        clearTimeout(timeout);
+        resolve();
+      },
+      { once: true }
+    );
 
-    socket.addEventListener("error", () => {
-      clearTimeout(timeout);
-      reject(new Error("WebSocket connection failed."));
-    }, { once: true });
+    socket.addEventListener(
+      "error",
+      () => {
+        clearTimeout(timeout);
+        reject(new Error("WebSocket connection failed."));
+      },
+      { once: true }
+    );
   });
 }
 
@@ -194,16 +194,4 @@ function sendStatus(status) {
 
 function sendStatusError(message) {
   chrome.runtime.sendMessage({ action: "ERROR", message });
-}
-
-function floatTo16BitPCM(float32Array) {
-  const buffer = new ArrayBuffer(float32Array.length * 2);
-  const view = new DataView(buffer);
-
-  for (let i = 0; i < float32Array.length; i++) {
-    const sample = Math.max(-1, Math.min(1, float32Array[i]));
-    view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-  }
-
-  return buffer;
 }
