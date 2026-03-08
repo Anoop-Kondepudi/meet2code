@@ -8,7 +8,7 @@ interface TodoItemProps {
 
 export default function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 overflow-hidden">
       <button
         onClick={() => onToggle(todo.id)}
         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -34,7 +34,7 @@ export default function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
         )}
       </button>
       <span
-        className={`text-sm font-medium flex-1 ${
+        className={`text-sm font-medium flex-1 min-w-0 break-words ${
           todo.completed ? 'line-through text-slate-400' : 'text-slate-800'
         }`}
       >
