@@ -13,16 +13,23 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { LabelBadge } from "@/components/ui/label-badge"
 import { PhaseColumn } from "@/components/pipeline/PhaseColumn"
-import {
-  mockTasks,
-  mockStats,
-  PHASE_ORDER,
-  getTasksByStatus,
-  type PipelineTask,
-} from "@/lib/mock-data"
+import { usePipelineData } from "@/lib/use-pipeline"
+import { PHASE_ORDER, type PipelineTask } from "@/lib/mock-data"
 
 export default function PipelinePage() {
+  const { tasks, stats, isLoading } = usePipelineData()
   const [selectedTask, setSelectedTask] = useState<PipelineTask | null>(null)
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-zinc-500 text-sm">Loading pipeline data...</div>
+      </div>
+    )
+  }
+
+  const getTasksByStatus = (status: string) =>
+    tasks.filter((t) => t.status === status)
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -30,25 +37,25 @@ export default function PipelinePage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           title="Total Tasks"
-          value={mockStats.totalTasks}
+          value={stats.totalTasks}
           icon={ListChecks}
           accentColor="blue"
         />
         <StatCard
           title="Plans Generated"
-          value={mockStats.plansGenerated}
+          value={stats.plansGenerated}
           icon={ClipboardCheck}
           accentColor="amber"
         />
         <StatCard
           title="PRs Opened"
-          value={mockStats.prsOpened}
+          value={stats.prsOpened}
           icon={GitPullRequest}
           accentColor="emerald"
         />
         <StatCard
           title="Cancelled"
-          value={mockStats.issuesCancelled}
+          value={stats.issuesCancelled}
           icon={X}
           accentColor="red"
         />
@@ -156,7 +163,7 @@ export default function PipelinePage() {
                       Last Updated
                     </h3>
                     <p className="text-sm text-zinc-300 font-mono">
-                      {new Date(selectedTask.lastUpdated).toLocaleTimeString()}
+                      {selectedTask.lastUpdated || "—"}
                     </p>
                   </div>
                   <div>

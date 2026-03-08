@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
-import { mockTasks, type TaskStatus, type TaskLabel, type PipelineTask, PHASE_ORDER, PHASE_LABELS } from "@/lib/mock-data"
+import { type TaskStatus, type TaskLabel, type PipelineTask, PHASE_ORDER, PHASE_LABELS } from "@/lib/mock-data"
+import { usePipelineData } from "@/lib/use-pipeline"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { LabelBadge } from "@/components/ui/label-badge"
 
@@ -21,11 +22,20 @@ function formatTime(iso: string): string {
 }
 
 export default function TasksPage() {
+  const { tasks, isLoading } = usePipelineData()
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all")
   const [labelFilter, setLabelFilter] = useState<TaskLabel | "all">("all")
   const [selectedTask, setSelectedTask] = useState<PipelineTask | null>(null)
 
-  const filtered = mockTasks.filter((t) => {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-zinc-500 text-sm">Loading tasks...</div>
+      </div>
+    )
+  }
+
+  const filtered = tasks.filter((t) => {
     if (statusFilter !== "all" && t.status !== statusFilter) return false
     if (labelFilter !== "all" && t.label !== labelFilter) return false
     return true

@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion"
 import { GitPullRequest, GitMerge, XCircle, FileCode } from "lucide-react"
-import { mockPRs, type PullRequest } from "@/lib/mock-data"
+import type { PullRequest } from "@/lib/mock-data"
+import { usePipelineData } from "@/lib/use-pipeline"
 import { StatCard } from "@/components/ui/stat-card"
 
 function formatDate(iso: string): string {
@@ -15,10 +16,6 @@ function formatDate(iso: string): string {
     hour12: false,
   })
 }
-
-const openCount = mockPRs.filter((pr) => pr.status === "open").length
-const mergedCount = mockPRs.filter((pr) => pr.status === "merged").length
-const closedCount = mockPRs.filter((pr) => pr.status === "closed").length
 
 const statusStyles: Record<PullRequest["status"], { icon: typeof GitPullRequest; border: string; iconBg: string; iconColor: string; badgeBg: string; badgeText: string; label: string }> = {
   open: {
@@ -51,6 +48,20 @@ const statusStyles: Record<PullRequest["status"], { icon: typeof GitPullRequest;
 }
 
 export default function PRsPage() {
+  const { prs, isLoading } = usePipelineData()
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-zinc-500 text-sm">Loading pull requests...</div>
+      </div>
+    )
+  }
+
+  const openCount = prs.filter((pr) => pr.status === "open").length
+  const mergedCount = prs.filter((pr) => pr.status === "merged").length
+  const closedCount = prs.filter((pr) => pr.status === "closed").length
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -67,7 +78,7 @@ export default function PRsPage() {
 
       {/* PR cards */}
       <div className="space-y-4">
-        {mockPRs.map((pr, i) => {
+        {prs.map((pr, i) => {
           const style = statusStyles[pr.status]
           const Icon = style.icon
 
@@ -104,9 +115,11 @@ export default function PRsPage() {
                       <FileCode className="w-3 h-3 shrink-0" />
                       {pr.branch}
                     </span>
-                    <span>
-                      Closes <span className="font-mono text-zinc-300">#{pr.issueNumber}</span>
-                    </span>
+                    {pr.issueNumber && (
+                      <span>
+                        Closes <span className="font-mono text-zinc-300">#{pr.issueNumber}</span>
+                      </span>
+                    )}
                     <span>{formatDate(pr.createdAt)}</span>
                   </div>
                 </div>
@@ -121,9 +134,9 @@ export default function PRsPage() {
           )
         })}
 
-        {mockPRs.length === 0 && (
+        {prs.length === 0 && (
           <div className="text-center py-12 text-zinc-500">
-            No pull requests yet.
+            No pull requests yet. PRs will appear here when the pipeline creates them.
           </div>
         )}
       </div>

@@ -39,6 +39,7 @@ logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 # Paths
 TRANSCRIPTS_DIR = PROJECT_ROOT / "data" / "transcripts"
 TASKS_FILE = PROJECT_ROOT / "data" / "tasks" / "tasks.md"
+STATUS_FILE = PROJECT_ROOT / "data" / "pipeline-status.json"
 FAKE_DATA_DIR = PROJECT_ROOT / "data" / "fake"
 
 # Token safety (rough estimate: 1 token ≈ 4 chars)
@@ -412,6 +413,14 @@ def main():
     while True:
         cycle += 1
         print(f"[cycle {cycle}] {datetime.now().strftime('%H:%M:%S')}")
+
+        # Write pipeline status for dashboard
+        STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        STATUS_FILE.write_text(json.dumps({
+            "isRunning": True,
+            "lastCycleTime": datetime.now().isoformat() + "Z",
+            "cycleCount": cycle,
+        }))
 
         try:
             has_data, prev_chunk_count = run_cycle(source_dir, args.dry_run, prev_chunk_count)

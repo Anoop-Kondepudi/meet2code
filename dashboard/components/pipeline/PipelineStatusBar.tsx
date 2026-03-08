@@ -3,13 +3,17 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Activity, Clock, Hash } from "lucide-react"
-import { mockStats } from "@/lib/mock-data"
+import type { PipelineStats } from "@/lib/mock-data"
 
-export function PipelineStatusBar() {
-  const { isRunning, lastCycleTime, cycleCount } = mockStats
-  const [timeAgo, setTimeAgo] = useState("just now")
+export function PipelineStatusBar({ stats }: { stats: PipelineStats }) {
+  const { isRunning, lastCycleTime, cycleCount } = stats
+  const [timeAgo, setTimeAgo] = useState("—")
 
   useEffect(() => {
+    if (!lastCycleTime) {
+      setTimeAgo("—")
+      return
+    }
     const lastCycle = new Date(lastCycleTime).getTime()
     const update = () => {
       const secs = Math.floor((Date.now() - lastCycle) / 1000)
@@ -60,7 +64,7 @@ export function PipelineStatusBar() {
 
       <div className="flex items-center gap-1.5 text-sm text-zinc-400">
         <Activity className="w-3.5 h-3.5" />
-        <span>5s interval</span>
+        <span>3s poll</span>
       </div>
     </motion.div>
   )
