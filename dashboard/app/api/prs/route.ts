@@ -25,9 +25,13 @@ export async function GET() {
     const ghPRs: GhPR[] = JSON.parse(result)
 
     const prs = ghPRs.map((pr) => {
-      // Try to extract task ID from branch name (hackai-TASK-{id})
-      const branchMatch = pr.headRefName.match(/hackai-TASK-(\d+)/i)
-      const titleMatch = pr.title.match(/TASK-(\d+)/i)
+      // Only correlate open PRs with tasks (ignore old closed/merged ones)
+      const branchMatch = pr.state === "OPEN"
+        ? pr.headRefName.match(/hackai-TASK-(\d+)/i)
+        : null
+      const titleMatch = pr.state === "OPEN"
+        ? pr.title.match(/TASK-(\d+)/i)
+        : null
       const taskId = branchMatch
         ? parseInt(branchMatch[1])
         : titleMatch

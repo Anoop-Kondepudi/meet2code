@@ -54,8 +54,14 @@ def _build_prompt(title: str, description: str, label: str, source: str) -> str:
 
 Write a concrete implementation plan for this issue. This plan will be posted as a comment on the GitHub issue and later used by an AI coding agent to implement the changes.
 
+IMPORTANT: The target application is the demo todo app located in the `demo/` folder:
+- Frontend: `demo/frontend/` (React + Vite + Tailwind CSS)
+- Backend: `demo/backend/` (Express + TypeScript)
+- Do NOT modify files in `dashboard/`, `backend/`, `pipeline/`, or any other top-level folder.
+- Only modify files under `demo/`.
+
 Requirements:
-- Identify the specific files that need to be modified or created
+- Identify the specific files under `demo/` that need to be modified or created
 - Describe the exact changes needed in each file
 - Note any edge cases or potential issues
 - Keep it actionable — another engineer (or AI) should be able to implement this without asking questions

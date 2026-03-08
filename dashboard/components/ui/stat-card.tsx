@@ -1,21 +1,25 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 function useAnimatedCounter(target: number, duration = 1200) {
-  const [count, setCount] = useState(0)
+  const [count, setCount] = useState(target)
+  const prevRef = useRef(target)
+
   useEffect(() => {
-    if (target === 0) return
+    const from = prevRef.current
+    prevRef.current = target
+    if (from === target) return
+
     const start = performance.now()
     function tick(now: number) {
       const elapsed = now - start
       const progress = Math.min(elapsed / duration, 1)
-      // ease out cubic
       const eased = 1 - Math.pow(1 - progress, 3)
-      setCount(Math.round(eased * target))
+      setCount(Math.round(from + (target - from) * eased))
       if (progress < 1) requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)

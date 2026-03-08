@@ -10,11 +10,18 @@ import type {
 } from "./mock-data"
 
 const POLL_INTERVAL = 3000
+// Transcript now uses WebSocket (use-transcript-stream.ts), not polling
 
 interface PipelineStatus {
   isRunning: boolean
   lastCycleTime: string | null
   cycleCount: number
+}
+
+export interface TranscriptData {
+  currentPartial: string
+  recentLines: string[]
+  transcript: { speaker: string; text: string; timestamp: string }[]
 }
 
 interface PipelineData {
@@ -48,7 +55,7 @@ function deriveStats(
   return {
     totalTasks: tasks.length,
     plansGenerated: tasksByStatus.planned + tasksByStatus.implementing + tasksByStatus["pr-open"],
-    prsOpened: prs.filter((p) => p.status === "open").length,
+    prsOpened: tasksByStatus["pr-open"],
     issuesCancelled: tasksByStatus.cancelled,
     tasksByStatus,
     isRunning: status.isRunning,
@@ -166,7 +173,7 @@ export function usePipelineData(): PipelineData {
   })
   const [isLoading, setIsLoading] = useState(true)
 
-  const fetchAll = useCallback(async () => {
+  const fetchPipeline = useCallback(async () => {
     try {
       const [tasksRes, prsRes, statusRes] = await Promise.all([
         fetch("/api/tasks"),
@@ -211,10 +218,10 @@ export function usePipelineData(): PipelineData {
   }, [])
 
   useEffect(() => {
-    fetchAll()
-    const id = setInterval(fetchAll, POLL_INTERVAL)
-    return () => clearInterval(id)
-  }, [fetchAll])
+    fetchPipeline()
+    const pipelineId = setInterval(fetchPipeline, POLL_INTERVAL)
+    return () => clearInterval(pipelineId)
+  }, [fetchPipeline])
 
   const stats = deriveStats(tasks, prs, status)
   const events = deriveEvents(tasks)

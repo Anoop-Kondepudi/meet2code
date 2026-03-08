@@ -1,10 +1,12 @@
 "use client"
 
+import { useRef, useEffect } from "react"
 import { motion } from "framer-motion"
-import { CheckSquare, FileText, GitPullRequest, XCircle } from "lucide-react"
+import { CheckSquare, FileText, GitPullRequest, XCircle, Mic, FileText as TranscriptIcon } from "lucide-react"
 import { PHASE_ORDER, PHASE_LABELS } from "@/lib/mock-data"
 import type { TaskStatus } from "@/lib/mock-data"
 import { usePipelineData } from "@/lib/use-pipeline"
+import { useTranscriptStream } from "@/lib/use-transcript-stream"
 import { StatCard } from "@/components/ui/stat-card"
 import { PipelineStatusBar } from "@/components/pipeline/PipelineStatusBar"
 import { ActivityFeed } from "@/components/pipeline/ActivityFeed"
@@ -20,6 +22,22 @@ const statusColors: Record<TaskStatus, { bg: string; text: string }> = {
 
 export default function Dashboard() {
   const { stats, events, isLoading } = usePipelineData()
+  const stream = useTranscriptStream()
+  const liveScrollRef = useRef<HTMLDivElement>(null)
+  const transcriptScrollRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll live terminal and transcript to bottom
+  useEffect(() => {
+    if (liveScrollRef.current) {
+      liveScrollRef.current.scrollTop = liveScrollRef.current.scrollHeight
+    }
+  }, [stream.recentLines, stream.currentPartial])
+
+  useEffect(() => {
+    if (transcriptScrollRef.current) {
+      transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight
+    }
+  }, [stream.transcript])
 
   if (isLoading) {
     return (
@@ -65,6 +83,90 @@ export default function Dashboard() {
           icon={XCircle}
           accentColor="red"
         />
+      </div>
+
+      {/* Meeting Transcription */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Live Terminal */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.4 }}
+          className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Mic className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-medium text-zinc-300">Live Transcription</h3>
+            {stream.isConnected && (
+              <span className="ml-auto flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${stream.currentPartial ? "bg-emerald-500 animate-pulse" : "bg-emerald-500/50"}`} />
+                <span className="text-xs text-emerald-400">{stream.currentPartial ? "Listening" : "Connected"}</span>
+              </span>
+            )}
+          </div>
+          <div
+            ref={liveScrollRef}
+            className="h-[240px] overflow-y-auto font-mono text-xs leading-relaxed space-y-0.5 scrollbar-thin"
+          >
+            {stream.recentLines.length > 0 || stream.currentPartial ? (
+              <>
+                {stream.recentLines.map((line, i) => (
+                  <div key={i} className="text-zinc-400">
+                    {line}
+                  </div>
+                ))}
+                {stream.currentPartial && (
+                  <div className="text-emerald-400/70">
+                    {stream.currentPartial}
+                    <span className="animate-pulse">▊</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-zinc-600 text-sm">
+                {stream.isConnected ? "Waiting for audio..." : "Connecting to transcriber..."}
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Right: Final Transcript */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.4 }}
+          className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-4"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <TranscriptIcon className="w-4 h-4 text-blue-400" />
+            <h3 className="text-sm font-medium text-zinc-300">Meeting Transcript</h3>
+            {stream.transcript.length > 0 && (
+              <span className="ml-auto text-xs text-zinc-500">
+                {stream.transcript.length} turns
+              </span>
+            )}
+          </div>
+          <div
+            ref={transcriptScrollRef}
+            className="h-[240px] overflow-y-auto space-y-2 scrollbar-thin"
+          >
+            {stream.transcript.length > 0 ? (
+              stream.transcript.map((entry, i) => (
+                <div key={i} className="text-sm">
+                  <span className="font-semibold text-blue-400">
+                    {entry.speaker === "A" ? "Anoop" : entry.speaker === "B" ? "Shiv" : entry.speaker === "C" ? "Nishil" : entry.speaker}
+                  </span>
+                  <span className="text-zinc-500 mx-1.5">·</span>
+                  <span className="text-zinc-300">{entry.text}</span>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center justify-center h-full text-zinc-600 text-sm">
+                No transcript yet
+              </div>
+            )}
+          </div>
+        </motion.div>
       </div>
 
       {/* Bottom Section: Status Breakdown + Activity Feed */}

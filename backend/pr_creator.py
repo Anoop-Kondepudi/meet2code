@@ -13,7 +13,8 @@ log = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REPO = os.getenv("GITHUB_REPO", "Anoop-Kondepudi/hackai")
 
-CODEX_TIMEOUT = 300  # 5 minutes
+CODEX_SANITY_TIMEOUT = 300   # 5 minutes for sanity check
+CODEX_IMPLEMENT_TIMEOUT = 600  # 10 minutes for implementation
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +67,7 @@ def sanity_check(plan: str, title: str, description: str,
             capture_output=True,
             text=True,
             cwd=PROJECT_ROOT,
-            timeout=CODEX_TIMEOUT,
+            timeout=CODEX_SANITY_TIMEOUT,
         )
 
         output = result.stdout.strip()
@@ -102,7 +103,7 @@ def sanity_check(plan: str, title: str, description: str,
 
     except subprocess.TimeoutExpired:
         log.error(f"Sanity check timed out for #{issue_number}")
-        print(f"  [sanity] Timed out after {CODEX_TIMEOUT}s — treating as actionable")
+        print(f"  [sanity] Timed out after {CODEX_SANITY_TIMEOUT}s — treating as actionable")
         return True
     except FileNotFoundError:
         log.error("codex CLI not found for sanity check")
@@ -134,9 +135,12 @@ def _build_implement_prompt(plan: str, title: str, description: str, label: str)
 
 Implement the changes described in the plan above. Make the actual code changes to the files in this repository.
 
+IMPORTANT: The target application is the demo todo app in the `demo/` folder. Only modify files under `demo/`.
+
 Rules:
 - Follow the plan closely — implement exactly what it describes
 - Write clean, production-quality code
+- Only modify files under the `demo/` directory
 - Do not modify files that the plan does not mention
 - Do not add unnecessary comments, docstrings, or type annotations beyond what's needed
 - If the plan mentions creating new files, create them
@@ -183,6 +187,10 @@ def implement_and_pr(plan: str, task_id: int, title: str, description: str,
         return "dry-run"
 
     try:
+        # 0. Clean up stale branch/worktree if they exist from a previous run
+        _run_git(["worktree", "remove", str(worktree_path), "--force"], cwd=PROJECT_ROOT)
+        _run_git(["branch", "-D", branch_name], cwd=PROJECT_ROOT)
+
         # 1. Create worktree with new branch
         code, _, stderr = _run_git(
             ["worktree", "add", str(worktree_path), "-b", branch_name],
@@ -206,18 +214,18 @@ def implement_and_pr(plan: str, task_id: int, title: str, description: str,
                     "-m", "gpt-5.4",
                     "-c", "model_reasoning_effort=\"xhigh\"",
                     "--skip-git-repo-check",
-                    "--full-auto",
+                    "--dangerously-bypass-approvals-and-sandbox",
                     prompt,
                 ],
                 capture_output=True,
                 text=True,
                 cwd=worktree_path,
-                timeout=CODEX_TIMEOUT,
+                timeout=CODEX_IMPLEMENT_TIMEOUT,
             )
         except subprocess.TimeoutExpired:
             log.error(f"Codex implementation timed out for #{issue_number}")
-            print(f"  [pr] Codex timed out after {CODEX_TIMEOUT}s")
-            _handle_pr_failure(issue_number, f"Code implementation timed out after {CODEX_TIMEOUT} seconds.")
+            print(f"  [pr] Codex timed out after {CODEX_IMPLEMENT_TIMEOUT}s")
+            _handle_pr_failure(issue_number, f"Code implementation timed out after {CODEX_IMPLEMENT_TIMEOUT} seconds.")
             return None
 
         if result.returncode != 0:

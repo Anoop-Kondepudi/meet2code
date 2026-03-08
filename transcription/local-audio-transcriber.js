@@ -1,8 +1,20 @@
 import { spawn } from "node:child_process";
 import { AssemblyAI } from "assemblyai";
+import { WebSocketServer } from "ws";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// WebSocket server for real-time streaming to dashboard
+const wss = new WebSocketServer({ port: 3002 });
+console.log("Transcript stream on ws://localhost:3002");
+
+function broadcast(data) {
+  const msg = JSON.stringify(data);
+  for (const client of wss.clients) {
+    if (client.readyState === 1) client.send(msg);
+  }
+}
 
 const apiKey = process.env.ASSEMBLYAI_API_KEY;
 if (!apiKey) {
@@ -52,15 +64,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOG_FILE = path.join(__dirname, "debug-transcription.log");
 const TRANSCRIPT_DIR = path.join(__dirname, "..", "data", "transcripts");
 const TRANSCRIPT_FILE = path.join(TRANSCRIPT_DIR, "live_meeting.json");
+const LIVE_STATE_FILE = path.join(TRANSCRIPT_DIR, "live_state.json");
 
 // Ensure transcript directory exists
 mkdirSync(TRANSCRIPT_DIR, { recursive: true });
 
 // In-memory transcript chunks (written to file for the pipeline)
 const transcriptChunks = [];
+// Recent terminal-style lines for the dashboard live view
+const recentLines = [];
+let currentPartial = "";
 
 function saveTranscript() {
   writeFileSync(TRANSCRIPT_FILE, JSON.stringify(transcriptChunks, null, 2));
+}
+
+function saveLiveState() {
+  writeFileSync(LIVE_STATE_FILE, JSON.stringify({
+    currentPartial,
+    recentLines: recentLines.slice(-30),
+  }));
 }
 
 appendFileSync(LOG_FILE, `\n--- Session started ${new Date().toISOString()} ---\n`);
@@ -77,20 +100,35 @@ transcriber.on("turn", (turn) => {
     console.log(`[${speaker}] ${formatted}`);
     appendFileSync(LOG_FILE, `[final][${speaker}] ${formatted}\n`);
 
-    // Save to transcript file for pipeline consumption
-    if (formatted.trim()) {
+    // Only save formatted finals (skip raw "?" duplicates)
+    if (formatted.trim() && speaker !== "?") {
       transcriptChunks.push({
         speaker: speaker,
         text: formatted,
         timestamp: new Date().toISOString(),
       });
       saveTranscript();
+
+      // Update live state
+      recentLines.push(`[${speaker}] ${formatted}`);
+      currentPartial = "";
+      saveLiveState();
+
+      // Broadcast final to dashboard via WebSocket
+      broadcast({ type: "final", speaker, text: formatted });
     }
   } else if (words.length > 0) {
     // Partial — show words building up in real time
     const partial = words.map(w => w.text).join(" ");
     process.stdout.write(`\r[${speaker}] ${partial}${"".padEnd(30)}`);
     appendFileSync(LOG_FILE, `[partial][${speaker}] ${partial}\n`);
+
+    // Update live state with current partial
+    currentPartial = `[${speaker}] ${partial}`;
+    saveLiveState();
+
+    // Broadcast partial to dashboard via WebSocket
+    broadcast({ type: "partial", speaker, text: partial });
   }
 });
 
