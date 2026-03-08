@@ -1,26 +1,26 @@
-# 🤖 DevJarvis
+# 🤖 Meet2Code
 **From Conversation to Code in Minutes.**
 An autonomous AI assistant that attends your meetings, extracts development tasks, and writes the code for you.
 
-DevJarvis combines real-time transcription, natural language understanding, and autonomous AI coding agents to turn spoken architecture discussions and sprint plannings directly into GitHub Pull Requests. You just review, approve, and merge.
+Meet2Code combines real-time transcription, natural language understanding, and autonomous AI coding agents to turn spoken architecture discussions and sprint plannings directly into GitHub Pull Requests. You just review, approve, and merge.
 
 ## 🌎 The Problem
 Developers spend nearly a third of their week in meetings—sprint planning, standups, and architecture syncs. After the meeting ends, the real work begins: translating discussions into Jira tickets, deciphering notes, setting up branches, and writing boilerplate code. This context switching kills productivity and leads to lost action items.
 
-DevJarvis provides a space where developers can focus on what they do best—solving hard problems and reviewing logic—while the AI handles the translation of conversation into functional code. 
+Meet2Code provides a space where developers can focus on what they do best—solving hard problems and reviewing logic—while the AI handles the translation of conversation into functional code. 
 
 ## 🧠 Inspiration
 Every developer has wished for an AI assistant like Iron Man's "Jarvis"—something that just listens to the plan and executes the tedious parts. We asked ourselves:
 *“What if a meeting didn't just result in action items, but in actual, reviewable code?”*
 
-We built DevJarvis to bridge the gap between product discussions and engineering execution—turning talk directly into actionable pull requests.
+We built Meet2Code to bridge the gap between product discussions and engineering execution—turning talk directly into actionable pull requests.
 
 ## 💡 What It Does
 ### 🎙️ Audio Transcription & Task Extraction
-DevJarvis listens in on your meetings and generates highly accurate transcripts. From these transcripts, it uses an LLM to automatically parse out concrete, actionable developer tasks and context.
+Meet2Code listens in on your meetings and generates highly accurate transcripts. From these transcripts, it uses an LLM to automatically parse out concrete, actionable developer tasks and context.
 
 ### 🤖 Autonomous Coding Agent
-Once a task is generated, DevJarvis hands it off to an AI coding agent (like Claude Code). The agent clones your repository, reads the existing codebase for context, and implements the required feature or bug fix.
+Once a task is generated, Meet2Code hands it off to an AI coding agent (like Claude Code). The agent clones your repository, reads the existing codebase for context, and implements the required feature or bug fix.
 
 ### 🌿 Git & GitHub Automation
 The agent automatically creates a new Git branch, commits the generated code with descriptive messages, and opens a Pull Request on GitHub. 
@@ -36,7 +36,7 @@ A sleek Next.js dashboard lets the engineering team monitor the pipeline in real
 
 ## 🚀 Use Cases
 * **Sprint Planning & Backlog Refinement:** Automatically assign and implement accepted sprint tasks.
-* **Bug Triage Meetings:** Discuss a bug, let DevJarvis find the root cause in the codebase, and open a fix PR.
+* **Bug Triage Meetings:** Discuss a bug, let Meet2Code find the root cause in the codebase, and open a fix PR.
 * **Architecture Syncs:** Scaffold new microservices or boilerplate based on verbal architectural decisions.
 
 ## 🛠️ How We Built It
@@ -69,5 +69,5 @@ Meeting Audio → `local-audio-transcriber.js` → JSON Transcript → Python Or
 * **Slack Bot Interface:** Allow developers to tag the bot in a Slack huddle or channel to trigger a PR generation without a formal meeting.
 * **Multi-Agent Collaboration:** Deploy multiple agents simultaneously to tackle different issues extracted from the same meeting.
 
-## ❤️ Why DevJarvis
-Because a developer's time is best spent reviewing, architecting, and innovating—not manually translating meeting notes into boilerplate. With DevJarvis, your repository grows while you talk.
+## ❤️ Why Meet2Code
+Because a developer's time is best spent reviewing, architecting, and innovating—not manually translating meeting notes into boilerplate. With Meet2Code, your repository grows while you talk.
