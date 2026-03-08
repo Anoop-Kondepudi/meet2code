@@ -134,6 +134,20 @@ export const mockTasks: PipelineTask[] = [
     unchangedCycles: 0,
   },
   {
+    id: 13,
+    title: "Add retry logic to webhook delivery",
+    status: "draft",
+    label: "bug",
+    issueNumber: 56,
+    prNumber: null,
+    prUrl: null,
+    description:
+      "Webhooks fail silently when the target server is down. Add exponential backoff retry (3 attempts, 1s/5s/30s) with dead letter queue for permanent failures.",
+    source: '"We lost a bunch of webhook events last night when the partner API went down." — Nishil, 14:13:20',
+    lastUpdated: "2026-03-07T14:13:20Z",
+    unchangedCycles: 0,
+  },
+  {
     id: 7,
     title: "Migrate cron jobs to BullMQ",
     status: "pr-open",
@@ -365,12 +379,12 @@ export const mockEvents: PipelineEvent[] = [
 ]
 
 export const mockStats: PipelineStats = {
-  totalTasks: 12,
+  totalTasks: 13,
   plansGenerated: 7,
   prsOpened: 2,
   issuesCancelled: 2,
   tasksByStatus: {
-    draft: 2,
+    draft: 3,
     planning: 2,
     planned: 2,
     implementing: 2,
