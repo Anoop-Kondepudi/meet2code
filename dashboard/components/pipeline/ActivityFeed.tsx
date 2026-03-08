@@ -64,7 +64,7 @@ function formatTime(ts: string) {
 }
 
 export function ActivityFeed({ events, limit }: { events: PipelineEvent[]; limit?: number }) {
-  const displayed = limit ? events.slice(-limit).reverse() : [...events].reverse()
+  const displayed = limit ? events.slice(0, limit) : events
 
   return (
     <div className="space-y-1">

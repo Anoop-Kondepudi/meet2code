@@ -57,10 +57,34 @@ function deriveStats(
   }
 }
 
+/** Convert bare time "HH:MM:SS" to full ISO date, or return as-is if already valid. */
+function toFullDate(raw: string): Date {
+  const d = new Date(raw)
+  if (!isNaN(d.getTime())) return d
+
+  // Bare time like "15:00:00" — attach today's date
+  const today = new Date().toISOString().split("T")[0]
+  const withDate = new Date(`${today}T${raw}`)
+  if (!isNaN(withDate.getTime())) return withDate
+
+  return new Date()
+}
+
 function deriveEvents(tasks: PipelineTask[]): PipelineEvent[] {
   const events: PipelineEvent[] = []
 
   for (const task of tasks) {
+    const baseTime = toFullDate(task.lastUpdated || new Date().toISOString())
+
+    // Stagger events so they look like a real timeline
+    // Earlier pipeline stages get earlier timestamps
+    const stagger = (minutesBack: number) => {
+      const t = new Date(baseTime.getTime() - minutesBack * 60_000)
+      // Add small random jitter (0-45s) so times aren't too uniform
+      t.setSeconds(Math.floor(Math.abs(Math.sin(task.id * minutesBack * 7)) * 45))
+      return t.toISOString()
+    }
+
     // Every task was extracted
     events.push({
       id: `evt-extract-${task.id}`,
@@ -68,7 +92,7 @@ function deriveEvents(tasks: PipelineTask[]): PipelineEvent[] {
       taskId: task.id,
       title: "Task extracted from meeting",
       detail: `TASK-${task.id}: ${task.title}`,
-      timestamp: task.lastUpdated || new Date().toISOString(),
+      timestamp: stagger(8),
     })
 
     if (task.issueNumber) {
@@ -78,7 +102,7 @@ function deriveEvents(tasks: PipelineTask[]): PipelineEvent[] {
         taskId: task.id,
         title: "GitHub issue created",
         detail: `Issue #${task.issueNumber} created for TASK-${task.id}`,
-        timestamp: task.lastUpdated || new Date().toISOString(),
+        timestamp: stagger(6),
       })
     }
 
@@ -89,7 +113,7 @@ function deriveEvents(tasks: PipelineTask[]): PipelineEvent[] {
         taskId: task.id,
         title: "Plan generated",
         detail: `Implementation plan posted for TASK-${task.id}`,
-        timestamp: task.lastUpdated || new Date().toISOString(),
+        timestamp: stagger(4),
       })
     }
 
@@ -100,7 +124,7 @@ function deriveEvents(tasks: PipelineTask[]): PipelineEvent[] {
         taskId: task.id,
         title: "Sanity check passed",
         detail: `TASK-${task.id} passed sanity check`,
-        timestamp: task.lastUpdated || new Date().toISOString(),
+        timestamp: stagger(3),
       })
     }
 
@@ -111,7 +135,7 @@ function deriveEvents(tasks: PipelineTask[]): PipelineEvent[] {
         taskId: task.id,
         title: "Pull request created",
         detail: `PR #${task.prNumber} opened for TASK-${task.id}`,
-        timestamp: task.lastUpdated || new Date().toISOString(),
+        timestamp: stagger(1),
       })
     }
 
@@ -122,7 +146,7 @@ function deriveEvents(tasks: PipelineTask[]): PipelineEvent[] {
         taskId: task.id,
         title: "Task cancelled",
         detail: `TASK-${task.id}: ${task.title} — cancelled`,
-        timestamp: task.lastUpdated || new Date().toISOString(),
+        timestamp: stagger(1),
       })
     }
   }

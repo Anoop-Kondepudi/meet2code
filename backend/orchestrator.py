@@ -418,7 +418,7 @@ def main():
         STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
         STATUS_FILE.write_text(json.dumps({
             "isRunning": True,
-            "lastCycleTime": datetime.now().isoformat() + "Z",
+            "lastCycleTime": datetime.now().isoformat(),
             "cycleCount": cycle,
         }))
 
