@@ -1,4 +1,4 @@
-// Types matching the actual HackAI pipeline data model
+// Types matching the actual Meet2Code pipeline data model
 
 export type TaskStatus = "draft" | "planning" | "planned" | "implementing" | "pr-open" | "cancelled"
 export type TaskLabel = "bug" | "feature" | "refactor" | "improvement"

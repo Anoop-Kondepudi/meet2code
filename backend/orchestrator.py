@@ -99,7 +99,7 @@ def format_issue_body(task: Task) -> str:
 {task.description}
 
 ---
-*Auto-generated from meeting transcript by HackAI pipeline.*"""
+*Auto-generated from meeting transcript by Meet2Code pipeline.*"""
 
 
 def handle_github_ops(changes: dict, dry_run: bool = False):
@@ -382,7 +382,7 @@ def run_cycle(source_dir: Path, dry_run: bool = False, prev_chunk_count: int = 0
 
 
 def main():
-    parser = argparse.ArgumentParser(description="HackAI meeting task extraction orchestrator")
+    parser = argparse.ArgumentParser(description="Meet2Code meeting task extraction orchestrator")
     parser.add_argument("--interval", type=int, default=5, help="Seconds between extraction cycles (default: 5)")
     parser.add_argument("--dry-run", action="store_true", help="Skip GitHub operations")
     parser.add_argument("--once", action="store_true", help="Run one cycle and exit")
@@ -391,7 +391,7 @@ def main():
 
     source_dir = FAKE_DATA_DIR if args.fake else TRANSCRIPTS_DIR
 
-    print(f"=== HackAI Orchestrator ===")
+    print(f"=== Meet2Code Orchestrator ===")
     print(f"Source: {source_dir}")
     print(f"Tasks: {TASKS_FILE}")
     print(f"Interval: {args.interval}s")

@@ -1,8 +1,8 @@
 {
-  "name": "hackai-demo",
+  "name": "meet2code-demo",
   "version": "1.0.0",
   "private": true,
-  "description": "Demo to-do list app for HackAI pipeline showcase",
+  "description": "Demo to-do list app for Meet2Code pipeline showcase",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm --prefix backend run dev",

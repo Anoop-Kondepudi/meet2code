@@ -1,6 +1,6 @@
 # TodoApp Demo
 
-Demo to-do list app for the HackAI pipeline showcase. This app has intentional bugs and missing features that will be discussed in demo meetings -- the agentic pipeline will automatically detect and fix them.
+Demo to-do list app for the Meet2Code pipeline showcase. This app has intentional bugs and missing features that will be discussed in demo meetings -- the agentic pipeline will automatically detect and fix them.
 
 ## Prerequisites
 
@@ -27,4 +27,4 @@ This starts both servers concurrently:
 
 ## Issues
 
-The `issues/` folder contains documented intentional issues in the app. These serve as targets for the HackAI agentic pipeline to discover and resolve during demo meetings.
+The `issues/` folder contains documented intentional issues in the app. These serve as targets for the Meet2Code agentic pipeline to discover and resolve during demo meetings.

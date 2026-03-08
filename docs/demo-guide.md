@@ -1,4 +1,4 @@
-# HackAI Demo Guide
+# Meet2Code Demo Guide
 
 Everything you need to run the full pipeline end-to-end for the dev post demo.
 

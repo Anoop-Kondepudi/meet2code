@@ -1,4 +1,4 @@
-# HackAI — Meeting-to-PR Pipeline
+# Meet2Code — Meeting-to-PR Pipeline
 
 ## Concept
 

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HackAI",
+  title: "Meet2Code",
   description: "Agentic meeting-to-PR pipeline — monitor tasks, plans, and pull requests in real time",
 };
 

@@ -1,6 +1,6 @@
 # Known Issues
 
-This folder documents intentional bugs and missing features in the TodoApp demo. These issues exist so that the HackAI agentic pipeline can detect and fix them during demo meetings.
+This folder documents intentional bugs and missing features in the TodoApp demo. These issues exist so that the Meet2Code agentic pipeline can detect and fix them during demo meetings.
 
 | # | Title | Label | Severity | Component | Description |
 |---|-------|-------|----------|-----------|-------------|
