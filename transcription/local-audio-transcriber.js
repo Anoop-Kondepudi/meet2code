@@ -23,8 +23,12 @@ const client = new AssemblyAI({ apiKey });
 const transcriber = client.streaming.transcriber({
   sampleRate,
   speechModel,
+  formatTurns: true,
   speakerLabels: enableSpeakerLabels,
-  ...(Number.isInteger(maxSpeakers) ? { maxSpeakers } : {})
+  ...(Number.isInteger(maxSpeakers) ? { maxSpeakers } : {}),
+  endOfTurnConfidenceThreshold: 0.4,
+  minEndOfTurnSilenceWhenConfident: 160,
+  maxTurnSilence: 400,
 });
 
 let ffmpegProcess;
@@ -40,12 +44,54 @@ transcriber.on("open", ({ id }) => {
   }
 });
 
+import { appendFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const LOG_FILE = path.join(__dirname, "debug-transcription.log");
+const TRANSCRIPT_DIR = path.join(__dirname, "..", "data", "transcripts");
+const TRANSCRIPT_FILE = path.join(TRANSCRIPT_DIR, "live_meeting.json");
+
+// Ensure transcript directory exists
+mkdirSync(TRANSCRIPT_DIR, { recursive: true });
+
+// In-memory transcript chunks (written to file for the pipeline)
+const transcriptChunks = [];
+
+function saveTranscript() {
+  writeFileSync(TRANSCRIPT_FILE, JSON.stringify(transcriptChunks, null, 2));
+}
+
+appendFileSync(LOG_FILE, `\n--- Session started ${new Date().toISOString()} ---\n`);
+
 transcriber.on("turn", (turn) => {
+  const words = turn.words || [];
   const text = (turn.transcript || "").trim();
-  if (!text) return;
-  const tag = turn.end_of_turn ? "final" : "partial";
-  const speaker = turn.speaker_label || "UNKNOWN";
-  console.log(`[${tag}][${speaker}] ${text}`);
+  const speaker = turn.speaker_label || "?";
+
+  if (turn.end_of_turn) {
+    // Final — print clean line
+    const formatted = turn.turn_is_formatted ? text : words.map(w => w.text).join(" ");
+    process.stdout.write(`\r${"".padEnd(120)}\r`);
+    console.log(`[${speaker}] ${formatted}`);
+    appendFileSync(LOG_FILE, `[final][${speaker}] ${formatted}\n`);
+
+    // Save to transcript file for pipeline consumption
+    if (formatted.trim()) {
+      transcriptChunks.push({
+        speaker: speaker,
+        text: formatted,
+        timestamp: new Date().toISOString(),
+      });
+      saveTranscript();
+    }
+  } else if (words.length > 0) {
+    // Partial — show words building up in real time
+    const partial = words.map(w => w.text).join(" ");
+    process.stdout.write(`\r[${speaker}] ${partial}${"".padEnd(30)}`);
+    appendFileSync(LOG_FILE, `[partial][${speaker}] ${partial}\n`);
+  }
 });
 
 transcriber.on("error", (error) => {
@@ -70,11 +116,30 @@ ffmpegProcess = spawn("ffmpeg", buildFfmpegArgs(), {
   stdio: ["ignore", "pipe", "pipe"]
 });
 
+// Buffer audio to meet AssemblyAI's 50-1000ms chunk duration requirement
+// At 16kHz mono 16-bit: 16000 samples/s * 2 bytes = 32000 bytes/s
+// 100ms = 3200 bytes
+const CHUNK_DURATION_MS = 100;
+const BYTES_PER_CHUNK = Math.floor(sampleRate * 2 * CHUNK_DURATION_MS / 1000);
+let audioBuffer = Buffer.alloc(0);
+
 ffmpegProcess.stdout.on("data", (chunk) => {
-  if (ready) {
-    transcriber.sendAudio(chunk);
-  } else {
-    queuedChunks.push(chunk);
+  audioBuffer = Buffer.concat([audioBuffer, chunk]);
+
+  while (audioBuffer.length >= BYTES_PER_CHUNK) {
+    const sendChunk = audioBuffer.subarray(0, BYTES_PER_CHUNK);
+    audioBuffer = audioBuffer.subarray(BYTES_PER_CHUNK);
+
+    if (ready) {
+      try {
+        transcriber.sendAudio(sendChunk);
+      } catch (e) {
+        console.error("Error sending audio, socket may have closed:", e.message);
+        ready = false;
+      }
+    } else {
+      queuedChunks.push(sendChunk);
+    }
   }
 });
 
@@ -109,6 +174,17 @@ async function shutdown(exitCode) {
     await transcriber.close();
   } catch (error) {
     console.error("Error closing transcriber:", error?.message || error);
+  }
+
+  // Signal the pipeline that the meeting ended
+  if (transcriptChunks.length > 0) {
+    transcriptChunks.push({
+      speaker: "SYSTEM",
+      text: "MEETING_ENDED",
+      timestamp: new Date().toISOString(),
+    });
+    saveTranscript();
+    console.log(`\nTranscript saved: ${TRANSCRIPT_FILE} (${transcriptChunks.length - 1} turns)`);
   }
 
   process.exit(exitCode);
